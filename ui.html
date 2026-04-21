@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Usability Analyzer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-2: #f5f5f5;
+    --bg-3: #ebebeb;
+    --border: #e0e0e0;
+    --text-1: #1a1a1a;
+    --text-2: #666666;
+    --text-3: #999999;
+    --primary: #0d99ff;
+    --primary-hover: #0077cc;
+    --success: #1bc47d;
+    --error: #f24822;
+    --warning: #ffaa00;
+    --radius: 8px;
+    --radius-sm: 5px;
+    --font: 'Inter', -apple-system, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text-1);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-left { display: flex; align-items: center; gap: 7px; }
+  .logo {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: linear-gradient(135deg, #0d99ff, #6c47ff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .header-title { font-size: 13px; font-weight: 700; color: var(--text-1); letter-spacing: -.01em; }
+  .header-version { font-size: 10px; color: var(--text-3); background: var(--bg-2); padding: 2px 5px; border-radius: 3px; }
+  .close-btn {
+    width: 24px; height: 24px; border: none; background: transparent;
+    cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-3);
+  }
+  .close-btn:hover { background: var(--bg-2); color: var(--text-1); }
+
+  /* ── MAIN ── */
+  .main { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── SECTION ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 7px;
+  }
+
+  /* ── SELECTION CARD ── */
+  .selection-card {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+    transition: border-color .15s;
+  }
+  .selection-card.has-selection { border-color: var(--primary); background: #f0f8ff; }
+  .selection-icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: var(--bg-2); display: flex; align-items: center;
+    justify-content: center; font-size: 16px; flex-shrink: 0;
+  }
+  .selection-card.has-selection .selection-icon { background: #deeeff; }
+  .selection-info { flex: 1; min-width: 0; }
+  .selection-name {
+    font-size: 12px; font-weight: 600; color: var(--text-1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .selection-meta { font-size: 10px; color: var(--text-3); }
+  .selection-empty .selection-name { color: var(--text-3); font-weight: 400; }
+
+  /* ── API KEY ── */
+  .api-row { display: flex; gap: 6px; }
+  .input {
+    flex: 1; height: 32px; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 0 10px;
+    font-family: var(--font); font-size: 12px; color: var(--text-1);
+    background: var(--bg); outline: none; transition: border-color .15s;
+  }
+  .input:focus { border-color: var(--primary); }
+  .input::placeholder { color: var(--text-3); }
+  .toggle-btn {
+    height: 32px; padding: 0 10px; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); background: var(--bg-2);
+    font-size: 11px; color: var(--text-2); cursor: pointer;
+    font-family: var(--font);
+  }
+  .toggle-btn:hover { background: var(--bg-3); }
+
+  /* ── ANALYZE BUTTON ── */
+  .analyze-btn {
+    width: 100%; height: 40px; border: none;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: var(--font); font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    transition: all .15s; letter-spacing: -.01em;
+  }
+  .analyze-btn.ready { background: var(--text-1); color: #fff; }
+  .analyze-btn.ready:hover { background: #333; }
+  .analyze-btn.ready:active { transform: scale(.98); }
+  .analyze-btn.disabled { background: var(--bg-3); color: var(--text-3); cursor: not-allowed; }
+  .analyze-btn.loading {
+    background: var(--bg-2); color: var(--text-2); cursor: not-allowed;
+  }
+
+  /* ── PROGRESS ── */
+  .progress-area {
+    display: none;
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .progress-area.visible { display: block; }
+  .progress-bar-wrap {
+    height: 3px; background: var(--bg-3); border-radius: 99px; margin-top: 8px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: var(--primary); border-radius: 99px;
+    transition: width .4s ease;
+  }
+  .progress-text { font-size: 12px; color: var(--text-2); }
+
+  /* ── ERROR ── */
+  .error-box {
+    display: none;
+    background: #fff2f0; border: 1.5px solid #ffd6d6;
+    border-radius: var(--radius); padding: 10px 12px;
+    font-size: 12px; color: var(--error);
+    display: none; align-items: center; gap: 8px;
+  }
+  .error-box.visible { display: flex; }
+
+  /* ── RESULT ── */
+  .result-area { display: none; }
+  .result-area.visible { display: block; }
+
+  .result-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .result-title { font-size: 12px; font-weight: 700; color: var(--text-1); }
+  .result-actions { display: flex; gap: 6px; }
+  .action-btn {
+    height: 28px; padding: 0 10px; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 11px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 5px;
+    transition: all .1s;
+  }
+  .action-btn.outline {
+    border: 1.5px solid var(--border); background: var(--bg); color: var(--text-2);
+  }
+  .action-btn.outline:hover { border-color: var(--text-2); color: var(--text-1); }
+  .action-btn.primary {
+    border: none; background: var(--text-1); color: #fff;
+  }
+  .action-btn.primary:hover { background: #333; }
+  .action-btn.success { background: var(--success); color: #fff; border: none; }
+
+  /* ── MARKDOWN RENDERER ── */
+  .markdown {
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    padding: 16px;
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1.5px solid var(--border);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-1);
+  }
+  .markdown::-webkit-scrollbar { width: 5px; }
+  .markdown::-webkit-scrollbar-track { background: transparent; }
+  .markdown::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 99px; }
+
+  .markdown h1 { font-size: 17px; font-weight: 800; letter-spacing: -.03em; margin: 0 0 12px; color: var(--text-1); }
+  .markdown h2 { font-size: 14px; font-weight: 700; letter-spacing: -.02em; margin: 20px 0 8px; padding-bottom: 6px; border-bottom: 1.5px solid var(--border); }
+  .markdown h2:first-child { margin-top: 0; }
+  .markdown h3 { font-size: 12px; font-weight: 700; margin: 14px 0 6px; color: var(--text-1); }
+  .markdown h4 { font-size: 11px; font-weight: 700; margin: 10px 0 4px; color: var(--text-2); }
+  .markdown p { margin: 6px 0; }
+  .markdown strong { font-weight: 700; color: var(--text-1); }
+  .markdown em { font-style: italic; color: var(--text-2); }
+  .markdown hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .markdown blockquote {
+    border-left: 3px solid var(--primary); padding: 4px 10px;
+    color: var(--text-2); background: #f0f8ff; border-radius: 0 4px 4px 0;
+    margin: 8px 0;
+  }
+  .markdown ul, .markdown ol { padding-left: 18px; margin: 6px 0; }
+  .markdown li { margin: 3px 0; }
+  .markdown code {
+    background: var(--bg-3); padding: 1px 5px; border-radius: 3px;
+    font-family: 'Menlo', monospace; font-size: 11px; color: #d63384;
+  }
+  .markdown pre {
+    background: #1a1a1a; color: #e0e0e0; padding: 10px 12px;
+    border-radius: var(--radius-sm); overflow-x: auto; margin: 8px 0;
+  }
+  .markdown pre code { background: none; color: inherit; padding: 0; }
+
+  /* TABLE */
+  .markdown table {
+    width: 100%; border-collapse: collapse; margin: 10px 0;
+    font-size: 11px;
+  }
+  .markdown th {
+    background: var(--bg-3); padding: 6px 8px; text-align: left;
+    font-weight: 700; border: 1px solid var(--border); color: var(--text-2);
+    font-size: 10px; letter-spacing: .03em; text-transform: uppercase;
+  }
+  .markdown td {
+    padding: 6px 8px; border: 1px solid var(--border); vertical-align: top;
+  }
+  .markdown tr:nth-child(even) td { background: #fafafa; }
+
+  /* SCORE BADGE */
+  .score-badge {
+    display: inline-block; padding: 1px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 700;
+  }
+  .score-5 { background: #d4f7e7; color: #0a7a45; }
+  .score-4 { background: #d9f0ff; color: #0066aa; }
+  .score-3 { background: #fff3cc; color: #7a5f00; }
+  .score-2 { background: #fde8cc; color: #7a3f00; }
+  .score-1 { background: #ffd6d6; color: #aa0000; }
+
+  /* META INFO */
+  .meta-row {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .meta-chip {
+    font-size: 10px; font-weight: 600; padding: 3px 8px;
+    border-radius: 99px; background: var(--bg-2); color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🔍</div>
+    <span class="header-title">Usability Analyzer</span>
+    <span class="header-version">v1.0</span>
+  </div>
+  <button class="close-btn" onclick="parent.postMessage({ pluginMessage: { type: 'close' } }, '*')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</div>
+
+<div class="main">
+
+  <!-- SELECTION -->
+  <div>
+    <div class="section-label">선택된 프레임</div>
+    <div class="selection-card selection-empty" id="selectionCard">
+      <div class="selection-icon" id="selectionIcon">🖼️</div>
+      <div class="selection-info">
+        <div class="selection-name" id="selectionName">프레임을 선택해 주세요</div>
+        <div class="selection-meta" id="selectionMeta">Figma에서 프레임, 컴포넌트, 섹션 선택</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API KEY -->
+  <div>
+    <div class="section-label">Gemini API Key</div>
+    <div class="api-row">
+      <input
+        class="input"
+        type="password"
+        id="apiKeyInput"
+        placeholder="AIza..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="toggle-btn" id="toggleVisibility" onclick="toggleKey()">보기</button>
+    </div>
+  </div>
+
+  <!-- ANALYZE BUTTON -->
+  <button class="analyze-btn disabled" id="analyzeBtn" onclick="startAnalysis()">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    분석하기
+  </button>
+
+  <!-- PROGRESS -->
+  <div class="progress-area" id="progressArea">
+    <div class="progress-text" id="progressText">분석 준비 중...</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-box" id="errorBox">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span id="errorText"></span>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result-area" id="resultArea">
+    <div class="result-header">
+      <span class="result-title">📋 분석 결과</span>
+      <div class="result-actions">
+        <button class="action-btn outline" id="copyBtn" onclick="copyResult()">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+          복사
+        </button>
+        <button class="action-btn primary" onclick="downloadResult()">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          .md 저장
+        </button>
+      </div>
+    </div>
+    <div class="meta-row" id="metaRow"></div>
+    <div class="markdown" id="markdownOutput"></div>
+  </div>
+
+</div>
+
+<script>
+  const GEMINI_MODEL = 'gemini-2.0-flash-preview';
+  const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+  const USABILITY_TEMPLATE = `
+# 사용성 테스트 분석 보고서 템플릿
+
+## 분석 프레임워크
+- 분석 방법: 휴리스틱 평가 (Nielsen Norman Group 10가지 사용성 원칙 기반)
+- 주요 평가 항목: 기능 인지 / 과업 흐름 / 탐색 유도 / 오류 방지
+
+## Nielsen 10가지 사용성 휴리스틱
+1. 시스템 상태의 가시성 (Visibility of system status)
+2. 시스템과 실제 세계의 일치 (Match between system and the real world)
+3. 사용자 통제와 자유 (User control and freedom)
+4. 일관성과 표준 (Consistency and standards)
+5. 오류 방지 (Error prevention)
+6. 인식 vs. 기억 (Recognition rather than recall)
+7. 사용의 유연성과 효율성 (Flexibility and efficiency of use)
+8. 미학적이고 최소한의 디자인 (Aesthetic and minimalist design)
+9. 오류 인식, 진단, 복구 지원 (Help users recognize, diagnose, and recover from errors)
+10. 도움말과 문서화 (Help and documentation)
+
+## 출력 형식
+다음 섹션을 포함한 마크다운 보고서:
+1. 개요 (서비스명, 분석 화면, 핵심 요약 1~2줄)
+2. 핵심 인사이트 (표: 인사이트 내용 | 설명 | 적용된 Nielsen 휴리스틱)
+3. 분석 (4-1 기능 인지 / 4-2 과업 흐름 / 4-3 탐색 유도 / 4-4 오류 방지 / 4-5 개선 아이디어)
+4. 종합 평가 (표: 평가 항목 | 점수 1~5 | 비고)
+`;
+
+  let currentResult = '';
+  let selectionData = null;
+  let capturedData = null;
+
+  // ── 플러그인 메시지 수신 ──
+  window.onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.type === 'selection') {
+      updateSelection(msg);
+    }
+
+    if (msg.type === 'progress') {
+      setProgress(msg.step, msg.message);
+    }
+
+    if (msg.type === 'data') {
+      capturedData = msg;
+      setProgress(3, '🤖 Gemini 분석 중...');
+      callGemini(msg);
+    }
+
+    if (msg.type === 'error') {
+      showError(msg.message);
+    }
+  };
+
+  // 초기화 시 선택 정보 요청
+  parent.postMessage({ pluginMessage: { type: 'get-selection' } }, '*');
+
+  // API Key 로드
+  const savedKey = localStorage.getItem('ua_gemini_key');
+  if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+
+  // API Key 변경 시 저장 + 버튼 상태 갱신
+  document.getElementById('apiKeyInput').addEventListener('input', () => {
+    localStorage.setItem('ua_gemini_key', document.getElementById('apiKeyInput').value);
+    updateAnalyzeBtn();
+  });
+
+  function updateSelection(msg) {
+    const card = document.getElementById('selectionCard');
+    const icon = document.getElementById('selectionIcon');
+    const name = document.getElementById('selectionName');
+    const meta = document.getElementById('selectionMeta');
+
+    if (msg.name) {
+      selectionData = msg;
+      card.classList.add('has-selection');
+      card.classList.remove('selection-empty');
+      icon.textContent = msg.nodeType === 'COMPONENT' ? '🧩' : msg.nodeType === 'SECTION' ? '📦' : '🖼️';
+      name.textContent = msg.name;
+      meta.textContent = `${msg.nodeType} · ${msg.width} × ${msg.height}px`;
+    } else {
+      selectionData = null;
+      card.classList.remove('has-selection');
+      card.classList.add('selection-empty');
+      icon.textContent = '🖼️';
+      name.textContent = '프레임을 선택해 주세요';
+      meta.textContent = 'Figma에서 프레임, 컴포넌트, 섹션 선택';
+    }
+    updateAnalyzeBtn();
+  }
+
+  function updateAnalyzeBtn() {
+    const btn = document.getElementById('analyzeBtn');
+    const hasKey = document.getElementById('apiKeyInput').value.trim().length > 10;
+    const hasSelection = !!selectionData;
+
+    if (hasKey && hasSelection) {
+      btn.className = 'analyze-btn ready';
+    } else {
+      btn.className = 'analyze-btn disabled';
+    }
+  }
+
+  function toggleKey() {
+    const input = document.getElementById('apiKeyInput');
+    const btn = document.getElementById('toggleVisibility');
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '숨기기';
+    } else {
+      input.type = 'password';
+      btn.textContent = '보기';
+    }
+  }
+
+  function startAnalysis() {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    if (!apiKey || !selectionData) return;
+
+    // UI 초기화
+    document.getElementById('errorBox').classList.remove('visible');
+    document.getElementById('resultArea').classList.remove('visible');
+    document.getElementById('progressArea').classList.add('visible');
+    document.getElementById('analyzeBtn').className = 'analyze-btn loading';
+    document.getElementById('analyzeBtn').textContent = '분석 중...';
+
+    setProgress(1, '📸 PNG 캡처 중...');
+
+    parent.postMessage({ pluginMessage: { type: 'analyze' } }, '*');
+  }
+
+  function setProgress(step, message) {
+    document.getElementById('progressText').textContent = message;
+    const pct = [0, 25, 55, 80, 100][step] || 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  async function callGemini(data) {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+    try {
+      // base64 변환
+      const uint8 = new Uint8Array(data.image);
+      const base64 = uint8ToBase64(uint8);
+
+      const prompt = buildPrompt(data);
+
+      const body = {
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: 'image/png',
+                data: base64
+              }
+            },
+            { text: prompt }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096
+        }
+      };
+
+      const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) throw new Error('Gemini 응답이 비어 있습니다.');
+
+      setProgress(4, '✅ 분석 완료!');
+      setTimeout(() => {
+        document.getElementById('progressArea').classList.remove('visible');
+        showResult(text, data);
+        resetAnalyzeBtn();
+      }, 600);
+
+    } catch (e) {
+      showError('Gemini API 오류: ' + e.message);
+    }
+  }
+
+  function buildPrompt(data) {
+    return `당신은 UX 전문가입니다. 첨부된 Figma 화면 이미지와 구조 데이터를 분석하여 사용성 보고서를 작성해 주세요.
+
+## 분석 대상
+- 화면명: ${data.nodeName}
+- 노드 타입: ${data.nodeType}
+- 화면 크기: ${data.nodeSize.width} × ${data.nodeSize.height}px
+- 사용된 색상: ${data.colorPalette.join(', ')}
+- 텍스트 스타일: ${JSON.stringify(data.textStyles)}
+
+## 구조 데이터 (JSON)
+\`\`\`json
+${data.tree}
+\`\`\`
+
+## 분석 기준
+${USABILITY_TEMPLATE}
+
+## 요청사항
+위 이미지와 구조 데이터를 바탕으로 다음 형식의 **한국어** 사용성 분석 보고서를 마크다운으로 작성해 주세요:
+
+1. **# 사용성 테스트 분석 보고서** 제목으로 시작
+2. 서비스명, 분석 일자(오늘), 분석 화면명 기재
+3. Nielsen 10 휴리스틱 중 해당하는 항목을 명시한 핵심 인사이트 표 (최소 4개 이상)
+4. 4개 분석 영역 (기능 인지 / 과업 흐름 / 탐색 유도 / 오류 방지) 각각 2~3문장 이상 분석
+5. 5개 개선 아이디어 제안
+6. 종합 평가 표 (점수 1~5)
+
+실제 화면을 보고 구체적으로 분석해 주세요. 추상적인 내용은 지양하고, 화면에서 직접 관찰된 내용을 근거로 작성해 주세요.`;
+  }
+
+  function showResult(text, data) {
+    currentResult = text;
+
+    // 메타 정보
+    const metaRow = document.getElementById('metaRow');
+    metaRow.innerHTML = `
+      <span class="meta-chip">🖼️ ${data.nodeName}</span>
+      <span class="meta-chip">${data.nodeSize.width}×${data.nodeSize.height}px</span>
+      <span class="meta-chip">${new Date().toLocaleDateString('ko-KR')}</span>
+      <span class="meta-chip">Gemini</span>
+    `;
+
+    // 마크다운 렌더링
+    document.getElementById('markdownOutput').innerHTML = renderMarkdown(text);
+
+    document.getElementById('resultArea').classList.add('visible');
+
+    // 스크롤
+    document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function resetAnalyzeBtn() {
+    const btn = document.getElementById('analyzeBtn');
+    btn.className = 'analyze-btn ready';
+    btn.innerHTML = `
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      다시 분석하기
+    `;
+  }
+
+  function showError(message) {
+    document.getElementById('errorBox').classList.add('visible');
+    document.getElementById('errorText').textContent = message;
+    document.getElementById('progressArea').classList.remove('visible');
+    document.getElementById('analyzeBtn').className = 'analyze-btn ready';
+    document.getElementById('analyzeBtn').innerHTML = `
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      분석하기
+    `;
+  }
+
+  function copyResult() {
+    navigator.clipboard.writeText(currentResult).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.className = 'action-btn success';
+      btn.textContent = '✓ 복사됨';
+      setTimeout(() => {
+        btn.className = 'action-btn outline';
+        btn.innerHTML = `
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+          복사
+        `;
+      }, 2000);
+    });
+  }
+
+  function downloadResult() {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+    const filename = `usability-report-${dateStr}.md`;
+
+    const blob = new Blob([currentResult], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Uint8Array → base64 ──
+  function uint8ToBase64(u8) {
+    let binary = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < u8.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
+
+  // ── 마크다운 렌더러 ──
+  function renderMarkdown(md) {
+    let html = md
+      // 코드 블록 (먼저 처리)
+      .replace(/```[\w]*\n([\s\S]*?)```/g, (_, code) =>
+        `<pre><code>${escHtml(code.trim())}</code></pre>`)
+
+      // 수평선
+      .replace(/^---+$/gm, '<hr>')
+
+      // 헤더
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+
+      // 볼드/이탤릭
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+
+      // 인라인 코드
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+
+      // 블록쿼트
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // 테이블 처리
+    html = renderTables(html);
+
+    // 리스트 처리
+    html = renderLists(html);
+
+    // 단락
+    html = html
+      .split('\n')
+      .map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return '';
+        if (/^<(h[1-6]|ul|ol|li|table|pre|hr|blockquote)/.test(trimmed)) return trimmed;
+        return `<p>${trimmed}</p>`;
+      })
+      .join('\n');
+
+    // 점수 뱃지 변환 (숫자/5 패턴)
+    html = html.replace(/\b([1-5])\/5\b/g, (_, n) =>
+      `<span class="score-badge score-${n}">${n}/5</span>`);
+
+    return html;
+  }
+
+  function renderTables(text) {
+    return text.replace(
+      /(\|.+\|\n)((?:\|[-:]+\|)+\n)((?:\|.+\|\n?)+)/g,
+      (match, header, separator, body) => {
+        const parseRow = row => row.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+        const headers = parseRow(header);
+        const rows = body.trim().split('\n').map(parseRow);
+
+        const th = headers.map(h => `<th>${h}</th>`).join('');
+        const trs = rows.map(row =>
+          '<tr>' + row.map(c => `<td>${c}</td>`).join('') + '</tr>'
+        ).join('');
+
+        return `<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+      }
+    );
+  }
+
+  function renderLists(text) {
+    // 순서 없는 리스트
+    text = text.replace(/((?:^[-*] .+\n?)+)/gm, match => {
+      const items = match.trim().split('\n')
+        .map(l => `<li>${l.replace(/^[-*] /, '')}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
+    });
+
+    // 순서 있는 리스트
+    text = text.replace(/((?:^\d+\. .+\n?)+)/gm, match => {
+      const items = match.trim().split('\n')
+        .map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`)
+        .join('');
+      return `<ol>${items}</ol>`;
+    });
+
+    return text;
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+</script>
+</body>
+</html>

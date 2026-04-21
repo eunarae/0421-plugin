@@ -1,0 +1,10 @@
+{
+  "name": "Usability Analyzer",
+  "id": "usability-analyzer-plugin-0421",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "networkAccess": {
+    "allowedDomains": ["https://generativelanguage.googleapis.com"]
+  }
+}
